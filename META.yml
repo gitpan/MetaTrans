@@ -1,0 +1,25 @@
+# http://module-build.sourceforge.net/META-spec.html
+#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
+name:         MetaTrans
+version:      1.01
+version_from: lib/MetaTrans.pm
+installdirs:  site
+requires:
+    Config::Find:                  0
+    Config::General:               0
+    HTML::Entities:                0
+    HTTP::Request:                 0
+    HTTP::Response:                0
+    LWP::UserAgent:                0
+    Proc::SyncExec:                0
+    Tk:                            804.027
+    Tk::BrowseEntry:               0
+    Tk::DialogBox:                 0
+    Tk::HList:                     0
+    Tk::ItemStyle:                 0
+    Tk::LabFrame:                  0
+    Tk::ROText:                    0
+    URI::Escape:                   0
+
+distribution_type: module
+generated_by: ExtUtils::MakeMaker version 6.17

@@ -1,0 +1,10 @@
+Revision history for Perl extension MetaTrans
+
+v1.01 (2004/12/13)
+- the very first release
+- 5 plug-ins provided for 5 online translators:
+    - MetaTrans::UltralinguaNet for http://ultralingua.net/
+    - MetaTrans::SlovnikCz      for http://www.slovnik.cz/
+    - MetaTrans::SeznamCz       for http://slovnik.seznam.cz/
+    - MetaTrans::SmsCz          for http://slovniky.sms.cz/
+    - MetaTrans::WordbookCz     for http://www.wordbook.cz/
