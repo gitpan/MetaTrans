@@ -80,7 +80,7 @@ use Encode;
 use IO::Select;
 use Proc::SyncExec qw(sync_fhpopen_noshell sync_popen_noshell);
 
-$VERSION   = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION   = do { my @r = (q$Revision: 1.4 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA       = qw(Exporter);
 @EXPORT_OK = qw(sort_translations);
 
@@ -629,9 +629,11 @@ sub sort_translations
     my @same;
     my $last_same;
 
-    while (my $trans = shift @trans_sorted)
+    while (1)
     {
-        if (@same == 0 || &_eq_stripped($trans, $last_same))
+        my $trans = shift @trans_sorted;
+
+        if (@same == 0 || $trans && &_eq_stripped($trans, $last_same))
         {
             $last_same = $trans;
             push @same, $last_same;
@@ -650,6 +652,8 @@ sub sort_translations
 
         $last_same = $trans;
         @same = ($last_same);
+
+        last unless $trans;
     }
 
     return @result;

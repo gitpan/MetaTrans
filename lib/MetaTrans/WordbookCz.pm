@@ -14,7 +14,7 @@ use MetaTrans::Base;
 use Encode;
 use HTTP::Request;
 
-$VERSION = do { my @r = (q$Revision: 1.1.1.1 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA     = qw(MetaTrans::Base);
 
 =head1 CONSTRUCTOR METHODS
@@ -42,10 +42,10 @@ sub new
     my $self = new MetaTrans::Base(%options);
     $self = bless $self, $class;
 
-    $self->set_languages("cze", "eng");
+    $self->set_languages("cze", "eng", "ger");
 
-    $self->set_dir_1_to_1("cze", "eng");
-    $self->set_dir_1_to_1("eng", "cze");
+    $self->set_dir_1_to_all("cze");
+    $self->set_dir_all_to_1("cze");
 
     return $self;
 }
@@ -74,11 +74,25 @@ sub create_request
     my $dest_lang_code = shift;
 
     my %table = (
-        cze => "c",
-        eng => "a",
+        eng => "enu",
+        ger => "ger",
     );
 
-    my $request = HTTP::Request->new(POST => "http://www.wordbook.cz/slovnik.php?fjazyk=cz");
+    my $fsmer;
+    my $fslovnik;
+
+    if ($src_lang_code eq 'cze')
+    {
+        $fsmer    = 1;
+        $fslovnik = $table{$dest_lang_code};
+    }
+    elsif ($dest_lang_code eq 'cze')
+    {
+        $fsmer    = 0;
+        $fslovnik = $table{$src_lang_code};
+    }
+
+    my $request = HTTP::Request->new(POST => "http://www.wordbook.cz/index.php");
     $request->content_type('application/x-www-form-urlencoded');
 
     # convert to Perl's internal UTF-8 format
@@ -89,10 +103,10 @@ sub create_request
     $expression = encode("iso-8859-2", $expression);
 
     my $query = 
-        "jeform=1" .
-        "&frozs=1" .
+        "fextend=1" .
         "&fslovo=$expression" .
-        "&fsmer=" . $table{$src_lang_code} . $table{$dest_lang_code};
+        "&fsmer=$fsmer" .
+        "&fslovnik=$fslovnik";
     $request->content($query);
 
     return $request;
@@ -118,22 +132,17 @@ sub process_response
 
     my @result;
     while ($contents =~ m|
-        <td\s+class="vyslb"\s*>\s*
-        ([^<]*?)\s*</td>\s*
-        <td\s+class="vyslb"\s*>\s*
-        ([^<]*?)\s*</td>\s*
+        <tr\s+[^>]*?>
+        <td\s+class="vyslradek"\s*>&nbsp;
+        ([^<]*?)&nbsp;</td>\s*
+        <td\s+class="vyslradek"\s*>
+        ([^<]*?)&nbsp;</td>\s*
     |gsix)
     {
         my $expr  = $1;
         my $trans = $2;
 
         next if $expr =~ /^\s*$/ || $trans =~ /^\s*$/;
-
-        # the output is in iso-8859-2 character encoding
-        # let's convert it to UTF-8
-        Encode::from_to($expr,  "iso-8859-2", "utf8");
-        Encode::from_to($trans, "iso-8859-2", "utf8");
-
         push @result, ($expr, $trans);
     }
 
