@@ -492,15 +492,7 @@ EOF
 # gui initialization                                                           #
 ################################################################################
 
-foreach my $lang_code ($MetaTrans->get_all_src_lang_codes)
-{
-    $from_be->insert('end', get_lang_by_code($lang_code));
-    $Src_Language = get_lang_by_code($lang_code)
-        unless defined $Src_Language;
-    $Src_Language = get_lang_by_code($lang_code)
-        if $lang_code eq $config{lang_from};
-}
-
+&populate_from_be;
 &populate_to_be;
 &enable_disable_swap;
 
@@ -525,6 +517,7 @@ foreach my $translator ($MetaTrans->get_translators)
         -bg       => 'white',
         -command  => sub {
             $MetaTrans->toggle_enabled_translator($translator);
+            &populate_from_be;
             &populate_to_be;
             &refresh_trans_states;
         },
@@ -547,6 +540,25 @@ foreach my $translator ($MetaTrans->get_translators)
 ################################################################################
 # procedures                                                                   #
 ################################################################################
+
+sub populate_from_be
+{
+    $from_be->delete(0, 'end');
+
+    my @src_lang_codes = $MetaTrans->get_all_src_lang_codes;
+    my %src_lang_codes_hash = map {($_, 1)} @src_lang_codes;
+
+    foreach my $lang_code (@src_lang_codes)
+        { $from_be->insert('end', get_lang_by_code($lang_code)); }
+
+    unless (defined $Src_Language &&
+        $src_lang_codes_hash{get_code_by_lang($Src_Language)})
+    {
+        $Src_Language = $src_lang_codes_hash{$config{lang_from}} ?
+            get_lang_by_code($config{lang_from}) :
+            get_lang_by_code($src_lang_codes[0]) ;
+    }
+}
 
 sub populate_to_be
 {
@@ -652,8 +664,6 @@ sub run_translation
     $MetaTrans->run_translators($Expression, $src_lang_code, $dest_lang_code,
         tk_safe => 1) or return;
 
-    $main->Busy;
-
     OUTER: while (1)
     {
         do
@@ -694,12 +704,9 @@ sub run_translation
                 $Expression, @translations));
             next;
         }
-        #print "$translation\n";
 
         push @translations, $translation;
     }
-
-    $main->Unbusy;
 }
 
 sub show_translations
@@ -711,7 +718,6 @@ sub show_translations
 
     foreach my $trans (@translations)
     {
-        #print "$trans\n";
         $trans = Encode::decode_utf8($trans)
             unless Encode::is_utf8($trans);
         my $eq_sign_pos = index($trans, '=');

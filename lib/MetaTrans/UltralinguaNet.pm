@@ -15,7 +15,7 @@ use Encode;
 use HTTP::Request;
 use URI::Escape;
 
-$VERSION = do { my @r = (q$Revision: 1.1.1.1 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA     = qw(MetaTrans::Base); # we derrive from MetaTrans::Base
 
 =head1 CONSTRUCTOR METHODS
@@ -116,7 +116,7 @@ sub create_request
     my $query = "http://ultralingua.net/index.html" .  # script name
         "?action=define&sub=1&searchtype=stemmed" .    # `static' options
         "&text=" . uri_escape($expression) .           # expr. to be translated
-        "&service=". $expression;                      # translation direction
+        "&service=". $direction;                       # translation direction
 
     # construct the HTTP::Request object
     my $request = new HTTP::Request("GET", $query);
@@ -145,7 +145,7 @@ sub process_response
     # The response is of course in HTML, we need to parse it.
     # In ultralingua.net's case it's a bit complicated as some expressions are
     # divided into multiple tags and also there are two hierarchical levels of
-    # the out. See other plug-ins source codes for simpler
+    # the output. See other plug-ins source codes for simpler examples
     # (try MetaTrans::SlovnikCz).
 
     my @result;
@@ -153,7 +153,7 @@ sub process_response
         <p\s+class="(main|expression)"\s*>
         (.*?)
         <span\s+class="number"\s*>\s*1\.\s*</span>(.*?)
-        (</p>|\z)
+        (</p>|</td>|\z)
     :gsix)
     {
         my $expr_part  = $2;

@@ -80,7 +80,7 @@ use Encode;
 use IO::Select;
 use Proc::SyncExec qw(sync_fhpopen_noshell sync_popen_noshell);
 
-$VERSION   = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION   = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA       = qw(Exporter);
 @EXPORT_OK = qw(sort_translations);
 
@@ -635,7 +635,7 @@ sub sort_translations
         {
             $last_same = $trans;
             push @same, $last_same;
-            next;
+            next unless @trans_sorted == 0;
         }
 
         # if the translations are the same when stripping the grammar info
