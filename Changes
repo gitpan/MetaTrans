@@ -1,5 +1,11 @@
 Revision history for Perl extension MetaTrans
 
+v1.02 (2004/12/15)
+- fixed a bug, which caused trouble when plugins returned no
+  translations for given input expression
+- updated translations sorting algorithm towards better performance
+  on input expressions consisting of multiple words
+
 v1.01 (2004/12/13)
 - the very first release
 - 5 plug-ins provided for 5 online translators:

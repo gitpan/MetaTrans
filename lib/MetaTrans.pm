@@ -80,7 +80,7 @@ use Encode;
 use IO::Select;
 use Proc::SyncExec qw(sync_fhpopen_noshell sync_popen_noshell);
 
-$VERSION   = do { my @r = (q$Revision: 1.1.1.1 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION   = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA       = qw(Exporter);
 @EXPORT_OK = qw(sort_translations);
 
@@ -672,7 +672,7 @@ sub _run_process
     my @translations  = $translator->translate($expression,
         $src_lang_code, $dest_lang_code);
     
-    if ($translations[0] !~ /=/)
+    if (@translations && $translations[0] !~ /=/)
     {
         print $translations[0] . "\n";
         exit;
@@ -701,6 +701,12 @@ sub _translation_order_index
 
     $index += 1
         if is_match_words($expr, $trans_left, 0);
+    $index *= 10;
+
+    $index += _words_matched($expr, $trans_left, 1);
+    $index *= 10;
+
+    $index += _words_matched($expr, $trans_left, 0);
     $index *= 100;
 
     my @words = split /\W+/, MetaTrans::Base::strip_grammar_info($trans_left);
@@ -760,6 +766,35 @@ sub _get_trans_id
     }
 
     return -1;
+}
+
+# returns number of words of $in_expr matched in $found_expr
+sub _words_matched
+{
+    my $in_expr    = shift;
+    my $found_expr = shift;
+    my $at_bounds  = shift;
+
+    my $in_stripped    = MetaTrans::Base::strip_grammar_info($in_expr);
+    my $found_stripped = MetaTrans::Base::strip_grammar_info($found_expr);
+
+    my $count = 0;
+    while ($in_stripped =~ /(\w+)/g)
+    {
+        my $word = $1;
+        if ($at_bounds)
+        {
+            $count++
+                if $found_stripped =~ /\b$word\b/;
+        }
+        else
+        {
+            $count++
+                if $found_stripped =~ /$word/;
+        }
+    }
+
+    return $count;
 }
 
 1;

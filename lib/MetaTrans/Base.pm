@@ -171,7 +171,7 @@ use HTML::Entities;
 use LWP::UserAgent;
 use HTTP::Response;
 
-$VERSION     = do { my @r = (q$Revision: 1.1.1.1 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION     = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA         = qw(Exporter);
 @EXPORT_OK   = qw(is_exact_match is_match_at_start is_match_expr is_match_words
     convert_to_utf8 M_EXACT M_START M_EXPR M_WORDS M_ALL);
@@ -1139,15 +1139,16 @@ sub run
         my @translations = $self->translate($expr, $src_lang_code,
             $dest_lang_code);
 
-        if ($translations[0] !~ /=/)
+        if (@translations && $translations[0] !~ /=/)
         {
             $state = $translations[0];
             next;
         }
         $state = "ok";
 
-        print join("$append\n", @translations);
-        print "$append\n";
+        foreach my $trans (@translations)
+            { print "$trans$append\n"; }
+
         print "\n" unless $i == @ARGV;
     }
 
