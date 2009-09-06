@@ -15,7 +15,7 @@ use Encode;
 use HTTP::Request;
 use URI::Escape;
 
-$VERSION = do { my @r = (q$Revision: 1.1.1.1 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA     = qw(MetaTrans::Base);
 
 =head1 CONSTRUCTOR METHODS
@@ -43,10 +43,19 @@ sub new
     my $self = new MetaTrans::Base(%options);
     $self = bless $self, $class;
 
-    $self->set_languages("cze", "eng", "ger", "fre", "spa", "ita", "rus", "lat");
+    # set supported languages
+    $self->set_languages("cze", "eng", "epo", "fre", "ger", "ita", "lat",
+        "pol", "rus", "slo", "spa");
 
-    $self->set_dir_1_to_all("cze");
-    $self->set_dir_all_to_1("cze");
+    $self->set_dir_1_to_spec("cze", "eng", "epo", "fre", "ger", "ita", "lat",
+        "pol", "rus", "spa");
+    $self->set_dir_spec_to_1("cze", "eng", "epo", "fre", "ger", "ita", "lat",
+        "pol", "rus", "spa");
+
+    # it also supports:
+    # Slovak <-> Esperanto
+    $self->set_dir_1_to_spec("slo", "epo");
+    $self->set_dir_spec_to_1("slo", "epo");
 
     return $self;
 }
@@ -75,18 +84,29 @@ sub create_request
     my $dest_lang_code = shift;
 
     my %table = (
+        cze => "cz",
         eng => "en",
-        ger => "ge",
+        epo => "eo",
         fre => "fr",
-        spa => "es",
+        ger => "ge",
         ita => "it",
-        rus => "ru",
         lat => "la",
+        pol => "pl",
+        rus => "ru",
+        slo => "sk",
+        spa => "sp",
     );
 
-    my $dir = $src_lang_code eq 'cze' ?
-        $table{$dest_lang_code} . "cz." . "cz_d" :
-        $table{$src_lang_code}  . "cz." . $table{$src_lang_code};
+
+    my $dict;
+    if ($src_lang_code eq 'cze' || $dest_lang_code eq 'cze') {
+        $dict = $table{'cze'};
+    } elsif ($src_lang_code eq 'slo' || $dest_lang_code eq 'slo') {
+        $dict = $table{'slo'};
+    }
+    my $dir = ($src_lang_code eq 'cze' || $src_lang_code eq 'slo') ?
+        $table{$dest_lang_code} . $dict . "." . $dict :
+        $table{$src_lang_code}  . $dict . "." . $table{$src_lang_code};
 
     my $query = "http://www.slovnik.cz/bin/mld.fpl" .
         "?lines=50&hptxt=0&use_cookies=0&js=0" .
@@ -116,17 +136,22 @@ sub process_response
     my $dest_lang_code = shift;
 
     my @result;
-    while ($contents =~ m|<div\s*class="vcb_pair">(.*?)</div>|gsi)
+    while ($contents =~ m|
+        <div\s+class="pair">
+        \s*
+        <span\s+class="l">
+        (.*?)
+        </span>
+        \s*-\s*
+        <span\s+class="r">
+        (.*?)
+        </span>
+        \s*
+        </div>
+    |gsix)
     {
-        my $pair = $1;
-        my $expr;
-        my $trans;
-
-        while ($pair =~ m|<span\s*class="vcb_l[ti]">\s*([^>]*?)\s*</span>|gsi)
-            { $expr .= " $1"; }
-
-        while ($pair =~ m|<span\s*class="vcb_r[ti]">\s*([^>]*?)\s*</span>|gsi)
-            { $trans .= " $1"; }
+        my $expr = _remove_html($1);
+        my $trans = _remove_html($2);;
 
         push @result, (
             &_postprocess_expr($expr, $src_lang_code),
@@ -162,6 +187,15 @@ sub _postprocess_expr
 
     # convert back from internal format
     return encode_utf8($expr_dec);
+}
+
+sub _remove_html
+{
+    my $string = shift;
+    $string =~ s/<i title="gnu">g<\/i>//g;
+    $string =~ s/<a\s+href="[^>]+">//g;
+    $string =~ s/<\/a>//g;
+    return $string;
 }
 
 1;

@@ -11,10 +11,9 @@ use warnings;
 use vars qw($VERSION @ISA);
 use MetaTrans::Base;
 
-use Encode;
 use HTTP::Request;
 
-$VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA     = qw(MetaTrans::Base);
 
 =head1 CONSTRUCTOR METHODS
@@ -42,7 +41,7 @@ sub new
     my $self = new MetaTrans::Base(%options);
     $self = bless $self, $class;
 
-    $self->set_languages("cze", "eng", "ger");
+    $self->set_languages("cze", "eng", "fre", "ger", "spa");
 
     $self->set_dir_1_to_all("cze");
     $self->set_dir_all_to_1("cze");
@@ -75,7 +74,9 @@ sub create_request
 
     my %table = (
         eng => "enu",
+        fre => "fra",
         ger => "ger",
+        spa => "spa",
     );
 
     my $fsmer;
@@ -94,14 +95,6 @@ sub create_request
 
     my $request = HTTP::Request->new(POST => "http://www.wordbook.cz/index.php");
     $request->content_type('application/x-www-form-urlencoded');
-
-    # convert to Perl's internal UTF-8 format
-    $expression = Encode::decode_utf8($expression)
-        unless Encode::is_utf8($expression);
-    
-    # convert to iso-8859-2 character encoding (that's what server expects)
-    $expression = encode("iso-8859-2", $expression);
-
     my $query = 
         "fextend=1" .
         "&fslovo=$expression" .
@@ -133,20 +126,55 @@ sub process_response
     my @result;
     while ($contents =~ m|
         <tr\s+[^>]*?>
-        <td\s+class="vyslradek"\s*>&nbsp;
-        ([^<]*?)&nbsp;</td>\s*
-        <td\s+class="vyslradek"\s*>
-        ([^<]*?)&nbsp;</td>\s*
+        (<td\s+class="vyslradek"\s*>.*?)
+        </tr>
     |gsix)
     {
-        my $expr  = $1;
-        my $trans = $2;
+        my $row = $1;
+        $row =~ s/&nbsp;//g;
+        my @data;
+        while ($row =~ m/<td\s+class="vyslradek">(.*?)<\/td>/gixm)
+        {
+            push @data, $1;
+        }
+	my ($expr, $trans, $note);
 
+	# exact words.
+	if (@data == 5) {
+	        (undef, $expr, undef, $trans, $note) = @data;
+
+	# similar words.
+	} elsif (@data == 3) {
+		($expr, $trans, $note) = @data;
+	}
+
+        # skip blank values.
         next if $expr =~ /^\s*$/ || $trans =~ /^\s*$/;
+
+        # normalize german.
+        $expr = _normalize_german($expr, $note)
+            if $src_lang_code eq 'ger';
+        $trans = _normalize_german($trans, $note)
+            if $dest_lang_code eq 'ger';
+
+        # new result.
         push @result, ($expr, $trans);
     }
 
     return @result;
+}
+
+sub _normalize_german
+{
+    my $expr = shift;
+    my $note = shift;
+
+    if ($note && ($note eq 'die' || $note eq 'das' || $note eq 'der'))
+    {
+        $expr .= '; ' . substr($note, 2, 1);
+    }
+
+    return $expr;
 }
 
 1;

@@ -66,7 +66,7 @@ use Tk::LabFrame;
 use Tk::ROText;
 
 use Config::Find;
-use Config::General;
+use Config::General qw(ParseConfig SaveConfig);
 use Encode;
 
 ################################################################################
@@ -554,9 +554,14 @@ sub populate_from_be
     unless (defined $Src_Language &&
         $src_lang_codes_hash{get_code_by_lang($Src_Language)})
     {
-        $Src_Language = $src_lang_codes_hash{$config{lang_from}} ?
-            get_lang_by_code($config{lang_from}) :
-            get_lang_by_code($src_lang_codes[0]) ;
+        if ($config{lang_from} && $src_lang_codes_hash{$config{lang_from}})
+        {
+            $Src_Language = get_lang_by_code($config{lang_from});
+	}
+        elsif ($src_lang_codes[0])
+        {
+            $Src_Language = get_lang_by_code($src_lang_codes[0]);
+	}
     }
 }
 
@@ -568,6 +573,10 @@ sub populate_to_be
         unless defined $Old_Dest_Language;
     undef $Dest_Language;
 
+    if (! defined $Src_Language)
+    {
+        return;
+    }
     my $src_lang_code = get_code_by_lang($Src_Language);
     foreach my $lang_code (
         $MetaTrans->get_dest_lang_codes_for_src_lang_code($src_lang_code))
@@ -585,20 +594,28 @@ sub populate_to_be
 
 sub enable_disable_swap
 {
-    my $src_lang_code  = get_code_by_lang($Src_Language);
-    my $dest_lang_code = get_code_by_lang($Dest_Language);
-    my @translators    = $MetaTrans->get_translators_for_direction(
-        $dest_lang_code, $src_lang_code);
+    my @translators = ();
+    if (defined $Src_Language && defined $Dest_Language)
+    {
+        my $src_lang_code  = get_code_by_lang($Src_Language);
+        my $dest_lang_code = get_code_by_lang($Dest_Language);
+        @translators       = $MetaTrans->get_translators_for_direction(
+            $dest_lang_code, $src_lang_code);
+    }
 
     $swap_b->configure(-state => @translators > 0 ? 'normal' : 'disabled');
 }
 
 sub refresh_trans_states
 {
-    my $src_lang_code   = get_code_by_lang($Src_Language);
-    my $dest_lang_code  = get_code_by_lang($Dest_Language);
-    my @available_trans = $MetaTrans->get_translators_for_direction(
-        $dest_lang_code, $src_lang_code);
+    my @available_trans = ();
+    if (defined $Src_Language && defined $Dest_Language)
+    {
+        my $src_lang_code  = get_code_by_lang($Src_Language);
+        my $dest_lang_code = get_code_by_lang($Dest_Language);
+        @available_trans   = $MetaTrans->get_translators_for_direction(
+            $dest_lang_code, $src_lang_code);
+    }
 
     my %available_trans_hash;
     foreach my $translator (@available_trans)
@@ -646,7 +663,7 @@ sub run_translation
     $Stop = 0;
 
     my $src_lang_code   = get_code_by_lang($Src_Language);
-    my $dest_lang_code    = get_code_by_lang($Dest_Language);
+    my $dest_lang_code  = get_code_by_lang($Dest_Language);
     my @available_trans = $MetaTrans->get_translators_for_direction(
         $dest_lang_code, $src_lang_code);
 

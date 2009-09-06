@@ -14,7 +14,7 @@ use MetaTrans::Base;
 use HTTP::Request;
 use URI::Escape;
 
-$VERSION = do { my @r = (q$Revision: 1.1.1.1 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA     = qw(MetaTrans::Base);
 
 =head1 CONSTRUCTOR METHODS
@@ -83,13 +83,11 @@ sub create_request
         rus => "ru",
     );
 
-    my $request = HTTP::Request->new(POST => "http://slovnik.seznam.cz/sl.fcgi");
-    $request->content_type('application/x-www-form-urlencoded');
-
     my $query =
-        "word=" . uri_escape($expression) .
-        "&src_trg=" . $table{$src_lang_code} . "_" . $table{$dest_lang_code};
-    $request->content($query);
+        'http://slovnik.seznam.cz/?' .
+        "q=" . uri_escape($expression) .
+        "&lang=" . $table{$src_lang_code} . "_" . $table{$dest_lang_code};
+    my $request = HTTP::Request->new(GET => $query);
 
     return $request;
 }
@@ -114,28 +112,79 @@ sub process_response
 
     my @result;
     while ($contents =~ m|
-        <strong>\s*<a\s[^>]*>\s*(.*?)\s*</a>\s*</strong>
-        \s*&nbsp;-&nbsp;
-        \s*<a\s[^>]*>\s*(.*?)\s*</a>
+        <tr>
+        \s*
+        <td\sclass="word">
+        \s*
+        (.*?)
+        \s*
+        </td>
+        \s*
+        <td\sclass="translated">
+        (.*?)
+        </td>
+        \s*
+        </tr>
     |gsix)
     {
-        my $expr  = $1;
-        my $trans = $2;
+        my $expr  = _get_expr($1);
+        my @trans = _get_trans($2);
 
-        # replace double commas with single commas
-        $expr  =~ s/,,/,/g;
-        $trans =~ s/,,/,/g;
-
-        # normalize german article: Hund, r -> Hund; r
-        $expr  =~ s/, (r|e|s)$/; $1/
+        $expr = _normalize_german($expr)
             if $src_lang_code eq 'ger';
-        $trans =~ s/, (r|e|s)$/; $1/
-            if $dest_lang_code eq 'ger';
 
-        push @result, ($expr, $trans);
+        foreach my $trans (@trans) {
+
+            $trans = _normalize_german($trans)
+                if $dest_lang_code eq 'ger';
+
+            push @result, ($expr, $trans);
+        }
     }
 
     return @result;
+}
+
+sub _get_expr
+{
+    my $string = shift;
+    $string =~ s/<img[^>]+>//g;
+    $string =~ s/<a\s+href="[^>]+"><\/a>//g;
+    if ($string =~ m/<a\s+href="[^>]+">(.*?)<\/a>/)
+    {
+        return $1;
+    }
+    else
+    {
+        return '';
+    }
+}
+
+sub _get_trans
+{
+    my $string = shift;
+    $string =~ s/<br\s*\/>//g;
+    $string =~ s/<img[^>]+>//g;
+    $string =~ s/<a\s+href="[^>]+"><\/a>//g;
+    $string =~ s/\s{2,}/ /g;
+    my @result;
+    while ($string =~ m/<a\s+href="[^>]+">(.*?)<\/a>/gimx)
+    {
+        push @result, $1;
+    }
+    return @result;
+}
+
+# normalize german article: Hund, r -> Hund; r
+sub _normalize_german
+{
+    my $expr = shift;
+
+    # normalize german article: Hund (der) -> Hund; r
+    $expr = $1 . "; " . substr($2, 2, 1)
+        if $expr =~ m/^(.*?),\s+(der|die|das)$/;
+
+    return $expr;
 }
 
 1;

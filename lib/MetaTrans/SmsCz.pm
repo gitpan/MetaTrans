@@ -14,7 +14,7 @@ use MetaTrans::Base qw(convert_to_utf8);
 use Encode;
 use HTTP::Request;
 
-$VERSION = do { my @r = (q$Revision: 1.1.1.1 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA     = qw(MetaTrans::Base);
 
 =head1 CONSTRUCTOR METHODS
@@ -83,9 +83,6 @@ sub create_request
         rus => "ru",
     );
 
-    my $request = HTTP::Request->new(POST => "http://www.sms.cz/index.php");
-    $request->content_type('application/x-www-form-urlencoded');
-
     # convert to Perl's internal UTF-8 format
     $expression = Encode::decode_utf8($expression)
         unless Encode::is_utf8($expression);
@@ -94,21 +91,20 @@ sub create_request
     $expression =~ s/\s+/+/g;
 
     # convert to cp1250 character encoding (that's what server expects)
-    $expression = Encode::encode("cp1250", lc $expression);
+    $expression = Encode::encode("cp1250", lc $expression)
+	if $src_lang_code ne 'rus';
 
     # do some server-specific character escapings
     $expression = &_my_escape($expression);
 
     my $query = 
+        "http://slovniky.sms.cz/index.php?" .
         "P_id_kategorie=65456" .
         "&P_soubor=/slovniky/index.php" .
-        "&P__kategorie=65456" .
-        "&P__soubor=/slovniky/index.php" .
-        "&reset=1" .
         "&send_data=1" .
         "&word=$expression" .
         "&bjvolba=" . $table{$src_lang_code} . "_" . $table{$dest_lang_code};
-    $request->content($query);
+    my $request = HTTP::Request->new(GET => $query);
 
     return $request;
 }

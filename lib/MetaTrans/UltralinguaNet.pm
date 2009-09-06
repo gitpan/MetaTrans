@@ -15,7 +15,7 @@ use Encode;
 use HTTP::Request;
 use URI::Escape;
 
-$VERSION = do { my @r = (q$Revision: 1.2 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
+$VERSION = do { my @r = (q$Revision: 1.3 $ =~ /\d+/g); sprintf "%d."."%02d", @r };
 @ISA     = qw(MetaTrans::Base); # we derrive from MetaTrans::Base
 
 =head1 CONSTRUCTOR METHODS
@@ -110,13 +110,12 @@ sub create_request
     # as a part of URL without causing any trouble
     $expression = uri_escape($expression);
 
-    # translation direction in the format that server understands
-    my $direction  = $table{$src_lang_code} . "2" . $table{$dest_lang_code};
-
-    my $query = "http://ultralingua.net/index.html" .  # script name
-        "?action=define&sub=1&searchtype=stemmed" .    # `static' options
+    my $query = "http://ultralingua.com/onlinedictionary/ulod.py" . # script name
+        "?action=define&clang=english" .               # `static' options
+        "&searchtype=stemming&nlang=english" .         # `static' options
         "&text=" . uri_escape($expression) .           # expr. to be translated
-        "&service=". $direction;                       # translation direction
+        "&srclang=" . $table{$src_lang_code} .          # translation from
+        "&dstlang=" . $table{$dest_lang_code};         # translation to
 
     # construct the HTTP::Request object
     my $request = new HTTP::Request("GET", $query);
@@ -142,58 +141,56 @@ sub process_response
     my $src_lang_code  = shift;
     my $dest_lang_code = shift;
 
-    # The response is of course in HTML, we need to parse it.
-    # In ultralingua.net's case it's a bit complicated as some expressions are
-    # divided into multiple tags and also there are two hierarchical levels of
-    # the output. See other plug-ins source codes for simpler examples
-    # (try MetaTrans::SlovnikCz).
-
     my @result;
-    while ($contents =~ m:
-        <p\s+class="(main|expression)"\s*>
+    while ($contents =~ m|
+        <div\s+class="definitionResult">
+        \s*
+        <div\s+class="term"[^>]*>
+        \s*
+        <span\s+class="ultext">
         (.*?)
-        <span\s+class="number"\s*>\s*1\.\s*</span>(.*?)
-        (</p>|</td>|\z)
-    :gsix)
+        </span>
+        .*?
+        </div>
+        \s*
+        <ol\s+class="definitions">
+        (.*?)
+        </ol>
+        \s*
+        </div>
+    |gsix)
     {
-        my $expr_part  = $2;
-        my $trans_part = $3;
-        my $expr;
 
-        while ($expr_part =~ m:<span\s+class="(headword|word)"\s*>(.*?)</span>([^<]*):gsi)
-        { 
-            my $expression = $2 . $3;
-            $expression =~ s/<[^>]*>//gs;
-            $expr .= $expression;
-        }
+        my $expr  = _get_expr($1);
+        my @trans = _get_trans($2);
 
-        if ($expr_part =~ m|<span\s+class="partofspeech"\s*>\s*([^>]*?)\s*</span>|si)
-            { $expr .= " ($1)"; }
-
-        $expr =~ s/\s+/ /g;
-        $expr =~ s/^ //;
-
-        foreach my $trans_block (split m|<span\s+class="number"\s*>\s*[0-9]\.\s*</span>|si, $trans_part)
-        {
-            my $trans;
-            
-            while ($trans_block =~ m|<span\s+class="transword"\s*>(.*?)</span>([^<]*)|gsi)
-            { 
-                my $expression = $1 . $2;
-                $expression =~ s/<[^>]*>//gs;
-                $trans .= $expression;
-            }
-
-            if ($trans_block =~ m|<span\s+class="partofspeech"\s*>\s*([^>]*?)\s*</span>|si)
-                { $trans .= " ($1)"; }
-
-            $trans =~ s/\s+/ /g;
-            $trans =~ s/^ //;
-
+        foreach my $trans (@trans) {
             push @result, ($expr, $trans);
         }
     }
 
+    return @result;
+}
+
+sub _get_expr
+{
+    my $string = shift;
+    $string =~ s/<a[^>]*>//g;
+    $string =~ s/<\/a>//g;
+    return $string;
+}
+
+sub _get_trans {
+    my $string = shift;
+    my @result;
+    while ($string =~ m|
+        <span\s+class="ultext">
+        (.*?)
+        </span>
+    |gsix)
+    {
+        push @result, _get_expr($1);
+    }
     return @result;
 }
 
